@@ -30,7 +30,16 @@ ALLOWED_HOSTS = env("DJANGO_ALLOWED_HOSTS")
 # a deploy works without hand-copying the generated hostname into two settings.
 RAILWAY_PUBLIC_DOMAIN = env("RAILWAY_PUBLIC_DOMAIN", default="")
 RAILWAY_PRIVATE_DOMAIN = env("RAILWAY_PRIVATE_DOMAIN", default="")
-for _domain in (RAILWAY_PUBLIC_DOMAIN, RAILWAY_PRIVATE_DOMAIN):
+ON_RAILWAY = bool(RAILWAY_PUBLIC_DOMAIN or RAILWAY_PRIVATE_DOMAIN)
+
+_railway_hosts = [RAILWAY_PUBLIC_DOMAIN, RAILWAY_PRIVATE_DOMAIN]
+if ON_RAILWAY:
+    # Railway's platform health check reaches the container directly and sends
+    # its own Host header, so it must be allowed or every probe 400s and the
+    # deploy never goes healthy.
+    _railway_hosts.append("healthcheck.railway.app")
+
+for _domain in _railway_hosts:
     if _domain and _domain not in ALLOWED_HOSTS:
         ALLOWED_HOSTS.append(_domain)
 
@@ -212,6 +221,9 @@ if RAILWAY_PUBLIC_DOMAIN:
 if not DEBUG:
     SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT", default=True)
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    # The platform probe hits the container over plain http with no
+    # X-Forwarded-Proto, so without this it gets a 301 and never sees a 200.
+    SECURE_REDIRECT_EXEMPT = [r"^api/health/$"]
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_HSTS_SECONDS = 31536000
