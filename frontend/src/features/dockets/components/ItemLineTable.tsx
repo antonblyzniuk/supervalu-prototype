@@ -48,7 +48,7 @@ export function ItemLineTable({ lines, onChange }: ItemLineTableProps) {
   return (
     <>
       <div className="table-scroll">
-        <table className="table grid-table" style={{ minWidth: '720px' }}>
+        <table className="table grid-table table--stacked" style={{ minWidth: '720px' }}>
           <thead>
             <tr>
               <th scope="col" className="u-sr-only">
@@ -73,8 +73,10 @@ export function ItemLineTable({ lines, onChange }: ItemLineTableProps) {
           <tbody>
             {lines.map((line, index) => (
               <tr key={index}>
-                <td className="grid-table__rownum">{index + 1}</td>
-                <td>
+                <td className="grid-table__rownum" data-label="Row">
+                  {index + 1}
+                </td>
+                <td data-label="Qty / units">
                   <input
                     className="input"
                     style={{ minWidth: '96px' }}
@@ -84,7 +86,7 @@ export function ItemLineTable({ lines, onChange }: ItemLineTableProps) {
                     aria-label={`Row ${index + 1} quantity`}
                   />
                 </td>
-                <td>
+                <td data-label="Description">
                   <input
                     className="input"
                     style={{ minWidth: '220px' }}
@@ -94,7 +96,7 @@ export function ItemLineTable({ lines, onChange }: ItemLineTableProps) {
                     aria-label={`Row ${index + 1} description`}
                   />
                 </td>
-                <td>
+                <td data-label="Cost €">
                   <input
                     className="input input--num"
                     style={{ minWidth: '90px' }}
@@ -105,7 +107,7 @@ export function ItemLineTable({ lines, onChange }: ItemLineTableProps) {
                     aria-label={`Row ${index + 1} cost price`}
                   />
                 </td>
-                <td>
+                <td data-label="Retail €">
                   <input
                     className="input input--num"
                     style={{ minWidth: '90px' }}
@@ -116,7 +118,7 @@ export function ItemLineTable({ lines, onChange }: ItemLineTableProps) {
                     aria-label={`Row ${index + 1} retail price`}
                   />
                 </td>
-                <td>
+                <td data-label="Total €">
                   <input
                     className="input input--num"
                     style={{ minWidth: '90px', fontWeight: 700 }}
@@ -146,7 +148,9 @@ export function ItemLineTable({ lines, onChange }: ItemLineTableProps) {
           <tfoot>
             <tr>
               <td colSpan={5}>TOTAL</td>
-              <td className="u-right u-num">{formatAmount(grandTotal)}</td>
+              <td className="u-right u-num" data-label="Docket total">
+                {formatAmount(grandTotal)}
+              </td>
               <td />
             </tr>
           </tfoot>

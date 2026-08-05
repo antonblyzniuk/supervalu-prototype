@@ -275,7 +275,7 @@ export function TopSheetPage() {
           />
         ) : (
           <div className="table-scroll">
-            <table className="table table--rows-clickable">
+            <table className="table table--rows-clickable table--stacked">
               <thead>
                 <tr>
                   <th scope="col">Date</th>
@@ -293,17 +293,19 @@ export function TopSheetPage() {
               <tbody>
                 {listQuery.data?.results.map((docket) => (
                   <tr key={docket.id} onClick={() => navigate(`/dockets/${docket.id}`)}>
-                    <td className="u-nowrap">{formatDate(docket.effective_date)}</td>
-                    <td className="u-nowrap">
+                    <td className="u-nowrap" data-label="Date">{formatDate(docket.effective_date)}</td>
+                    <td className="u-nowrap" data-label="Store">
                       {docket.store_detail.name}
                       {docket.destination_store_detail && (
                         <span className="u-subtle"> → {docket.destination_store_detail.name}</span>
                       )}
                     </td>
-                    <td className="u-mono">{docket.reference || docket.docket_number || '—'}</td>
-                    <td>{docket.supplier || docket.manager_name || '—'}</td>
-                    <td className="u-right u-num">{docket.line_count}</td>
-                    <td className="u-right u-num" style={{ fontWeight: 700 }}>
+                    <td className="u-mono" data-label="Reference">
+                      {docket.reference || docket.docket_number || '—'}
+                    </td>
+                    <td data-label="Supplier / route">{docket.supplier || docket.manager_name || '—'}</td>
+                    <td className="u-right u-num" data-label="Rows">{docket.line_count}</td>
+                    <td className="u-right u-num" data-label="Total" style={{ fontWeight: 700 }}>
                       {formatMoney(docket.total)}
                     </td>
                   </tr>

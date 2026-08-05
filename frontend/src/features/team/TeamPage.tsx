@@ -129,7 +129,7 @@ export function TeamPage() {
       ) : (
         <Card title={`${teamQuery.data?.count ?? 0} people`} flush>
           <div className="table-scroll">
-            <table className="table">
+            <table className="table table--stacked">
               <thead>
                 <tr>
                   <th scope="col">Name</th>
@@ -144,18 +144,22 @@ export function TeamPage() {
               <tbody>
                 {members.map((member) => (
                   <tr key={member.id} style={{ opacity: member.is_active ? 1 : 0.55 }}>
-                    <td>
-                      <div style={{ fontWeight: 600 }}>{member.full_name}</div>
-                      <div className="u-subtle" style={{ fontSize: 'var(--text-xs)' }}>
-                        {member.email}
-                        {member.id === user?.id && ' · you'}
-                        {!member.is_active && ' · deactivated'}
+                    <td data-label="Name">
+                      {/* One wrapper so the stacked mobile layout treats the
+                          name and email as a single value, not two columns. */}
+                      <div>
+                        <div style={{ fontWeight: 600 }}>{member.full_name}</div>
+                        <div className="u-subtle" style={{ fontSize: 'var(--text-xs)' }}>
+                          {member.email}
+                          {member.id === user?.id && ' · you'}
+                          {!member.is_active && ' · deactivated'}
+                        </div>
                       </div>
                     </td>
-                    <td>
+                    <td data-label="Role">
                       <Badge tone={ROLE_TONE[member.role]}>{member.role}</Badge>
                     </td>
-                    <td style={{ minWidth: '190px' }}>
+                    <td data-label="Store" style={{ minWidth: '190px' }}>
                       <select
                         className="select"
                         aria-label={`Store for ${member.full_name}`}
@@ -171,11 +175,11 @@ export function TeamPage() {
                         ))}
                       </select>
                     </td>
-                    <td className="u-nowrap u-muted">
+                    <td className="u-nowrap u-muted" data-label="Last seen">
                       {member.last_login ? formatDate(member.last_login) : 'Never'}
                     </td>
                     <td className="u-right">
-                      <Button variant="ghost" size="sm" onClick={() => setEditing(member)}>
+                      <Button variant="ghost" size="sm" block onClick={() => setEditing(member)}>
                         Edit
                       </Button>
                     </td>

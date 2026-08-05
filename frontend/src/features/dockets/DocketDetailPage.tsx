@@ -159,7 +159,7 @@ export function DocketDetailPage() {
       <Card title={isCategory ? 'Docket entries' : 'Goods'} flush>
         <div className="table-scroll">
           {isCategory && typeMeta ? (
-            <table className="table">
+            <table className="table table--stacked">
               <thead>
                 <tr>
                   <th scope="col">Date</th>
@@ -179,18 +179,18 @@ export function DocketDetailPage() {
               <tbody>
                 {docket.lines.map((line, index) => (
                   <tr key={line.id ?? index}>
-                    <td className="u-nowrap">{formatDate(line.line_date)}</td>
-                    <td>{line.supplier || '—'}</td>
-                    <td className="u-mono">{line.docket_number || '—'}</td>
+                    <td className="u-nowrap" data-label="Date">{formatDate(line.line_date)}</td>
+                    <td data-label="Supplier">{line.supplier || '—'}</td>
+                    <td className="u-mono" data-label="Docket #">{line.docket_number || '—'}</td>
                     {typeMeta.columns.map((column) => (
-                      <td key={column.key} className="u-right u-num">
+                      <td key={column.key} className="u-right u-num" data-label={column.label}>
                         {formatAmount(line.amounts?.[column.key]) || ''}
                       </td>
                     ))}
-                    <td className="u-right u-num" style={{ fontWeight: 700 }}>
+                    <td className="u-right u-num" data-label="Row total" style={{ fontWeight: 700 }}>
                       {formatAmount(line.total)}
                     </td>
-                    <td>{line.comments || ''}</td>
+                    <td data-label="Comments">{line.comments || ''}</td>
                   </tr>
                 ))}
               </tbody>
@@ -198,17 +198,17 @@ export function DocketDetailPage() {
                 <tr>
                   <td colSpan={3}>TOTALS</td>
                   {typeMeta.columns.map((column) => (
-                    <td key={column.key} className="u-right u-num">
+                    <td key={column.key} className="u-right u-num" data-label={column.label}>
                       {formatAmount(docket.category_totals[column.key]) || ''}
                     </td>
                   ))}
-                  <td className="u-right u-num">{formatAmount(docket.total)}</td>
+                  <td className="u-right u-num" data-label="Docket total">{formatAmount(docket.total)}</td>
                   <td />
                 </tr>
               </tfoot>
             </table>
           ) : (
-            <table className="table">
+            <table className="table table--stacked">
               <thead>
                 <tr>
                   <th scope="col">Qty / Units</th>
@@ -227,11 +227,11 @@ export function DocketDetailPage() {
               <tbody>
                 {docket.lines.map((line, index) => (
                   <tr key={line.id ?? index}>
-                    <td>{line.quantity || '—'}</td>
-                    <td>{line.description || '—'}</td>
-                    <td className="u-right u-num">{formatAmount(line.cost_price)}</td>
-                    <td className="u-right u-num">{formatAmount(line.retail_price)}</td>
-                    <td className="u-right u-num" style={{ fontWeight: 700 }}>
+                    <td data-label="Qty / units">{line.quantity || '—'}</td>
+                    <td data-label="Description">{line.description || '—'}</td>
+                    <td className="u-right u-num" data-label="Cost €">{formatAmount(line.cost_price)}</td>
+                    <td className="u-right u-num" data-label="Retail €">{formatAmount(line.retail_price)}</td>
+                    <td className="u-right u-num" data-label="Total €" style={{ fontWeight: 700 }}>
                       {formatAmount(line.total)}
                     </td>
                   </tr>
@@ -240,7 +240,7 @@ export function DocketDetailPage() {
               <tfoot>
                 <tr>
                   <td colSpan={4}>TOTAL</td>
-                  <td className="u-right u-num">{formatAmount(docket.total)}</td>
+                  <td className="u-right u-num" data-label="Docket total">{formatAmount(docket.total)}</td>
                 </tr>
               </tfoot>
             </table>

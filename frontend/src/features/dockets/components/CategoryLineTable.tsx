@@ -51,7 +51,10 @@ export function CategoryLineTable({ columns, lines, onChange }: CategoryLineTabl
   return (
     <>
       <div className="table-scroll">
-        <table className="table grid-table" style={{ minWidth: `${520 + columns.length * 78}px` }}>
+        <table
+          className="table grid-table table--stacked"
+          style={{ minWidth: `${520 + columns.length * 78}px` }}
+        >
           <thead>
             <tr>
               <th scope="col" className="u-sr-only">
@@ -77,8 +80,10 @@ export function CategoryLineTable({ columns, lines, onChange }: CategoryLineTabl
           <tbody>
             {lines.map((line, index) => (
               <tr key={index}>
-                <td className="grid-table__rownum">{index + 1}</td>
-                <td>
+                <td className="grid-table__rownum" data-label="Row">
+                  {index + 1}
+                </td>
+                <td data-label="Date">
                   <input
                     className="input"
                     type="date"
@@ -87,7 +92,7 @@ export function CategoryLineTable({ columns, lines, onChange }: CategoryLineTabl
                     aria-label={`Row ${index + 1} date`}
                   />
                 </td>
-                <td>
+                <td data-label="Supplier">
                   <input
                     className="input"
                     style={{ minWidth: '130px' }}
@@ -97,7 +102,7 @@ export function CategoryLineTable({ columns, lines, onChange }: CategoryLineTabl
                     aria-label={`Row ${index + 1} supplier`}
                   />
                 </td>
-                <td>
+                <td data-label="Docket #">
                   <input
                     className="input"
                     style={{ minWidth: '84px' }}
@@ -108,7 +113,7 @@ export function CategoryLineTable({ columns, lines, onChange }: CategoryLineTabl
                   />
                 </td>
                 {columns.map((column) => (
-                  <td key={column.key}>
+                  <td key={column.key} data-label={column.label}>
                     <input
                       className="input input--num"
                       style={{ minWidth: '74px' }}
@@ -121,10 +126,10 @@ export function CategoryLineTable({ columns, lines, onChange }: CategoryLineTabl
                     />
                   </td>
                 ))}
-                <td className="u-right u-num" style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
+                <td className="u-right u-num" data-label="Row total" style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
                   {formatAmount(rowTotal(line, columns)) || '0.00'}
                 </td>
-                <td>
+                <td data-label="Comments">
                   <input
                     className="input"
                     style={{ minWidth: '130px' }}
@@ -152,11 +157,13 @@ export function CategoryLineTable({ columns, lines, onChange }: CategoryLineTabl
             <tr>
               <td colSpan={4}>TOTALS</td>
               {columnTotals.map((total, index) => (
-                <td key={columns[index]?.key} className="u-right u-num">
+                <td key={columns[index]?.key} className="u-right u-num" data-label={columns[index]?.label}>
                   {total ? formatAmount(total) : ''}
                 </td>
               ))}
-              <td className="u-right u-num">{formatAmount(grandTotal)}</td>
+              <td className="u-right u-num" data-label="Docket total">
+                {formatAmount(grandTotal)}
+              </td>
               <td colSpan={2} />
             </tr>
           </tfoot>

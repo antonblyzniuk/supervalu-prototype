@@ -1155,6 +1155,146 @@
     flex: 1;
   }
 
+  /* Editable tables become stacked cards.
+     A docket line has up to 14 columns; on a phone that is a sideways scroll
+     with the headers off-screen, so every field is relabelled inline instead.
+     Read-only report tables keep their horizontal scroll — they are for
+     reading, not typing. */
+  .table--stacked,
+  .table--stacked tbody,
+  .table--stacked tfoot,
+  .table--stacked tr,
+  .table--stacked td {
+    display: block;
+    width: 100%;
+  }
+
+  .table--stacked {
+    /* Beats the inline min-width that keeps columns readable on desktop. */
+    min-width: 0 !important;
+  }
+
+  .table--stacked thead {
+    display: none;
+  }
+
+  .table--stacked tbody tr,
+  .table--stacked tfoot tr {
+    background: var(--surface) !important;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--space-2) var(--space-3);
+    margin-bottom: var(--space-3);
+  }
+
+  .table--stacked tbody tr:hover {
+    background: var(--surface) !important;
+  }
+
+  .table--stacked td {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 40px;
+    padding: var(--space-1) 0;
+    border-bottom: 1px solid var(--surface-sunken);
+    text-align: left;
+  }
+
+  .table--stacked tr td:last-child {
+    border-bottom: none;
+  }
+
+  .table--stacked td::before {
+    content: attr(data-label);
+    flex: 0 0 38%;
+    font-size: var(--text-2xs);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  /* Cells with nothing to label (action buttons) get the full width. */
+  .table--stacked td:not([data-label])::before {
+    display: none;
+  }
+
+  .table--stacked td > * {
+    min-width: 0;
+  }
+
+  .table--stacked .input {
+    min-width: 0 !important;
+    width: 100%;
+    border-color: var(--border);
+    background: var(--surface-sunken);
+    text-align: left;
+  }
+
+  .table--stacked .input--num {
+    text-align: right;
+  }
+
+  /* Row number becomes the card's heading. */
+  .table--stacked .grid-table__rownum {
+    justify-content: flex-start;
+    gap: var(--space-1);
+    font-weight: 700;
+    font-size: var(--text-sm);
+    color: var(--text);
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: var(--space-1);
+    padding-bottom: var(--space-2);
+  }
+
+  .table--stacked .grid-table__rownum::before {
+    content: 'Row';
+    flex: 0 0 auto;
+    font-size: var(--text-2xs);
+  }
+
+  /* Remove sits at the foot of its card, and says what it does — a bare ✕ in a
+     stack of cards gives no clue which row it belongs to. */
+  .table--stacked .grid-table__remove {
+    justify-content: stretch;
+    padding-top: var(--space-2);
+  }
+
+  .table--stacked .grid-table__remove::before {
+    display: none;
+  }
+
+  .table--stacked .grid-table__remove .btn {
+    width: 100%;
+    padding: 0 var(--space-3);
+  }
+
+  .table--stacked .grid-table__remove .btn::after {
+    content: 'Remove this row';
+    font-size: var(--text-xs);
+  }
+
+  .table--stacked td:empty {
+    display: none;
+  }
+
+  /* Report tables stay genuinely tabular — stacking a store-by-store
+     comparison would destroy the comparison. Fade the right edge so it is
+     obvious there is more to scroll to. */
+  .table-scroll {
+    position: relative;
+    background:
+      linear-gradient(to right, var(--surface) 30%, transparent),
+      linear-gradient(to right, transparent, var(--surface) 70%) 100% 0,
+      radial-gradient(farthest-side at 0 50%, rgb(16 18 15 / 14%), transparent),
+      radial-gradient(farthest-side at 100% 50%, rgb(16 18 15 / 14%), transparent) 100% 0;
+    background-repeat: no-repeat;
+    background-size: 40px 100%, 40px 100%, 14px 100%, 14px 100%;
+    background-attachment: local, local, scroll, scroll;
+  }
+
   .modal-backdrop {
     align-items: flex-end;
     padding: 0;

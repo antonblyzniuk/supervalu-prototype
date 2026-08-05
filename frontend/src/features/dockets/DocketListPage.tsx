@@ -125,7 +125,7 @@ export function DocketListPage() {
           }
         >
           <div className="table-scroll">
-            <table className="table table--rows-clickable">
+            <table className="table table--rows-clickable table--stacked">
               <thead>
                 <tr>
                   <th scope="col">Type</th>
@@ -151,15 +151,17 @@ export function DocketListPage() {
                       if (event.key === 'Enter') navigate(`/dockets/${docket.id}`)
                     }}
                   >
-                    <td>
+                    <td data-label="Type">
                       <Badge tone={docket.docket_type}>
                         {DOCKET_TYPE_LABELS[docket.docket_type]}
                       </Badge>
                     </td>
-                    <td className="u-nowrap">{docket.store_detail.name}</td>
-                    <td className="u-nowrap">{formatDate(docket.effective_date)}</td>
-                    <td className="u-mono">{docket.reference || docket.docket_number || '—'}</td>
-                    <td>
+                    <td className="u-nowrap" data-label="Store">{docket.store_detail.name}</td>
+                    <td className="u-nowrap" data-label="Date">{formatDate(docket.effective_date)}</td>
+                    <td className="u-mono" data-label="Reference">
+                      {docket.reference || docket.docket_number || '—'}
+                    </td>
+                    <td data-label="Supplier / route">
                       {docket.destination_store_detail
                         ? `${docket.store_detail.name} → ${docket.destination_store_detail.name}`
                         : docket.supplier || docket.manager_name || '—'}
@@ -167,8 +169,8 @@ export function DocketListPage() {
                         <span className="u-subtle"> · 📷 {docket.photo_count}</span>
                       )}
                     </td>
-                    <td className="u-right u-num">{docket.line_count}</td>
-                    <td className="u-right u-num" style={{ fontWeight: 700 }}>
+                    <td className="u-right u-num" data-label="Rows">{docket.line_count}</td>
+                    <td className="u-right u-num" data-label="Total" style={{ fontWeight: 700 }}>
                       {formatMoney(docket.total)}
                     </td>
                   </tr>
