@@ -109,8 +109,38 @@ requires a rebuild, which is exactly why the default keeps everything relative.
 
 ## 4. First run
 
-Generate the domains for both services, then create the first admin **inside the
-running container**:
+### Option A — the setup page (no shell needed)
+
+Set this on the **backend** service:
+
+```
+ADMIN_BOOTSTRAP_CODE=<a long random string>
+```
+
+```bash
+python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+Then open `https://<frontend-domain>/setup-admin`, enter the code plus the email
+and password you want, and you are signed in as an admin. The account is a
+Django superuser too, so `https://<frontend-domain>/admin/` works with the same
+credentials.
+
+The route is not linked from anywhere in the UI — you reach it by typing the
+URL.
+
+> **Unset `ADMIN_BOOTSTRAP_CODE` once you have your admin.** With no code
+> configured the endpoint returns 404 and the page says setup is switched off.
+> While it is set, anyone who learns the code can mint an admin account.
+> Attempts are rate limited and every one is logged, but the code is the only
+> thing standing in the way — treat it like a password.
+
+Everyone else is added from **Team** inside the app; this endpoint only ever
+creates admins.
+
+### Option B — the shell
+
+Create the first admin **inside the running container**:
 
 ```bash
 railway link                      # select the project

@@ -125,6 +125,11 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 AUTH_USER_MODEL = "accounts.User"
 
+# Shared code that lets someone create an admin account through
+# /api/auth/bootstrap-admin/. Leave it unset and the endpoint is disabled —
+# which is what it should be once the first admin exists.
+ADMIN_BOOTSTRAP_CODE = env("ADMIN_BOOTSTRAP_CODE", default="")
+
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
@@ -181,6 +186,14 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 25,
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
+    # Only applies to views that set `throttle_scope`.
+    "DEFAULT_THROTTLE_CLASSES": ("rest_framework.throttling.ScopedRateThrottle",),
+    "DEFAULT_THROTTLE_RATES": {
+        # Guards the shared-code endpoint against brute force. Counted in the
+        # local-memory cache, so it is per gunicorn worker — a speed bump, not
+        # a wall. The code itself needs to be long and random.
+        "admin_bootstrap": env("ADMIN_BOOTSTRAP_RATE", default="5/hour"),
+    },
 }
 
 SIMPLE_JWT = {

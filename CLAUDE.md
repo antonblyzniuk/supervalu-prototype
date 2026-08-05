@@ -54,6 +54,12 @@ docker compose up -d / logs -f / down
   are UX only. The API is the boundary; add both when adding a scoped screen.
 - Only an admin can grant or revoke the admin role, and nobody can change their
   own role or deactivate themselves (`TeamMemberSerializer`).
+- `/api/auth/bootstrap-admin/` creates an admin from a shared code
+  (`ADMIN_BOOTSTRAP_CODE`), for first setup without shell access. It 404s when
+  the variable is unset, compares the code with `secrets.compare_digest`, and is
+  rate limited via the `admin_bootstrap` throttle scope. It must only ever
+  create admins — never widen it to other roles or make it authenticated-optional
+  in some other way.
 - Emails are stored lower-cased and sign-in is case-insensitive
   (`apps/accounts/auth_serializers.py`). Keep new user-creation paths going
   through `UserManager.create_user` so that holds.

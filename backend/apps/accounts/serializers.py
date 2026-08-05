@@ -1,3 +1,6 @@
+import secrets
+
+from django.conf import settings
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 
@@ -143,3 +146,37 @@ class TeamMemberCreateSerializer(serializers.ModelSerializer):
             user.is_staff = True
             user.save(update_fields=["is_staff"])
         return user
+
+
+class AdminBootstrapSerializer(serializers.Serializer):
+    """Creates an admin account for whoever holds the shared setup code.
+
+    Only ever creates admins — it exists so the first account can be made
+    without shell access, and so a locked-out office can make another. Every
+    other account is created by a manager on /team.
+    """
+
+    secret_code = serializers.CharField(write_only=True, trim_whitespace=False)
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True, validators=[validate_password])
+    first_name = serializers.CharField(required=False, allow_blank=True, max_length=150)
+    last_name = serializers.CharField(required=False, allow_blank=True, max_length=150)
+
+    def validate_email(self, value):
+        normalized = User.objects.normalize_email(value).lower()
+        if User.objects.filter(email__iexact=normalized).exists():
+            raise serializers.ValidationError("An account with that email already exists.")
+        return normalized
+
+    def validate_secret_code(self, value):
+        expected = settings.ADMIN_BOOTSTRAP_CODE
+        # The view refuses the request outright when no code is configured;
+        # this is belt and braces so an empty code can never match.
+        if not expected or not secrets.compare_digest(value, expected):
+            raise serializers.ValidationError("That setup code is not valid.")
+        return value
+
+    def create(self, validated_data):
+        validated_data.pop("secret_code")
+        password = validated_data.pop("password")
+        return User.objects.create_superuser(password=password, **validated_data)

@@ -42,6 +42,8 @@ services:
       SECURE_SSL_REDIRECT: ${SECURE_SSL_REDIRECT:-True}
       COLLECT_STATIC: ${COLLECT_STATIC:-0}
       DJANGO_MEDIA_ROOT: ${DJANGO_MEDIA_ROOT:-/app/media}
+      # Enables the /setup-admin page. Leave unset to switch it off.
+      ADMIN_BOOTSTRAP_CODE: ${ADMIN_BOOTSTRAP_CODE:-}
     volumes:
       - ./backend:/app
       - static_data:/app/staticfiles

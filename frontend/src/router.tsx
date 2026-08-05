@@ -3,6 +3,7 @@ import { createBrowserRouter } from 'react-router-dom'
 import { AppLayout } from '@/components/AppLayout'
 import { ManagerRoute, ProtectedRoute } from '@/components/ProtectedRoute'
 import { LoginPage } from '@/features/auth/LoginPage'
+import { SetupAdminPage } from '@/features/auth/SetupAdminPage'
 import { DocketDetailPage } from '@/features/dockets/DocketDetailPage'
 import { DocketFormPage } from '@/features/dockets/DocketFormPage'
 import { DocketListPage } from '@/features/dockets/DocketListPage'
@@ -14,6 +15,8 @@ import { NotFoundPage } from '@/pages/NotFoundPage'
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
+  // Unlinked on purpose — reached by typing the URL, gated by the setup code.
+  { path: '/setup-admin', element: <SetupAdminPage /> },
   {
     element: <ProtectedRoute />,
     children: [

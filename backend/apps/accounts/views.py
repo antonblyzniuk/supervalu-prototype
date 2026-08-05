@@ -1,14 +1,20 @@
+import logging
+
+from django.conf import settings
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.http import Http404
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from apps.core.permissions import IsManager
 
 from .models import User
 from .serializers import (
+    AdminBootstrapSerializer,
     TeamMemberCreateSerializer,
     TeamMemberSerializer,
     UserSerializer,
@@ -22,6 +28,46 @@ class MeView(generics.RetrieveAPIView):
 
     def get_object(self):
         return self.request.user
+
+
+logger = logging.getLogger(__name__)
+
+
+class AdminBootstrapView(generics.CreateAPIView):
+    """Create an admin account by presenting the shared setup code.
+
+    Exists so the first admin can be created without shell access. Disabled
+    entirely unless ADMIN_BOOTSTRAP_CODE is set, so unsetting that variable
+    once the office is up and running closes the door.
+    """
+
+    serializer_class = AdminBootstrapSerializer
+    permission_classes = (AllowAny,)
+    authentication_classes = ()
+    throttle_scope = "admin_bootstrap"
+
+    @extend_schema(
+        summary="Create an admin account with the shared setup code",
+        responses={201: UserSerializer, 400: None, 404: None},
+    )
+    def post(self, request, *args, **kwargs):
+        if not settings.ADMIN_BOOTSTRAP_CODE:
+            # 404 rather than 403: an endpoint that is switched off should not
+            # advertise that it exists.
+            raise Http404
+
+        serializer = self.get_serializer(data=request.data)
+        if not serializer.is_valid():
+            logger.warning(
+                "Admin bootstrap rejected from %s: %s",
+                request.META.get("REMOTE_ADDR", "unknown"),
+                ", ".join(serializer.errors),
+            )
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        user = serializer.save()
+        logger.info("Admin account %s created via bootstrap endpoint.", user.email)
+        return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
 
 
 class TeamViewSet(viewsets.ModelViewSet):
