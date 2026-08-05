@@ -47,11 +47,14 @@ RUN chmod +x /app/entrypoint.sh \
     && mkdir -p /app/staticfiles /app/media \
     && chown -R appuser:appuser /app
 
-USER appuser
-
 # Static files are baked in at build time so a cold start is just gunicorn.
 RUN DJANGO_SECRET_KEY=build-only DJANGO_DEBUG=False \
-    python manage.py collectstatic --noinput
+    python manage.py collectstatic --noinput \
+    && chown -R appuser:appuser /app/staticfiles
+
+# Deliberately still root here: the entrypoint needs it to take ownership of a
+# mounted volume (Railway mounts them root-owned), then drops to appuser with
+# setpriv before exec'ing the server.
 
 ENTRYPOINT ["/app/entrypoint.sh"]
 # Shell form: Railway assigns $PORT at runtime, so it cannot be baked in.

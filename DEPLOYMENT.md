@@ -238,7 +238,15 @@ so this should work; if a proxy in front strips that header, set
 **Signatures/photos 404** — the volume is missing or `DJANGO_MEDIA_ROOT` does
 not match its mount path.
 
-**Images vanish after a deploy** — no volume mounted; see above.
+**Images vanish after a deploy** — no volume mounted. `GET /api/health/` says so
+directly: `"media_persistent": false` with a warning. The app keeps working;
+uploads just do not survive the next deploy.
+
+**Saving a docket with a signature fails** — check `/api/health/`. If `media`
+is not `"ok"`, the upload directory is not writable. The container fixes
+ownership of the mount at start-up and falls back to a writable path if it
+cannot, logging a warning, so this should be self-healing; a persistent failure
+means `DJANGO_MEDIA_ROOT` points somewhere the container cannot create at all.
 
 **CSRF failures in `/admin/`** — add the *frontend* origin to
 `CSRF_TRUSTED_ORIGINS`; that is the origin the browser posts from.

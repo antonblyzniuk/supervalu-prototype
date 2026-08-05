@@ -83,12 +83,40 @@ export function SignaturePad({ label, value, onChange, name, onNameChange }: Sig
     lastPoint.current = point
   }
 
+  /** True only if some pixel is actually painted, not merely touched. */
+  const hasVisibleInk = (canvas: HTMLCanvasElement) => {
+    const context = canvas.getContext('2d', { willReadFrequently: true })
+    if (!context) return false
+    try {
+      const { data } = context.getImageData(0, 0, canvas.width, canvas.height)
+      for (let i = 3; i < data.length; i += 4) {
+        if (data[i] !== 0) return true
+      }
+    } catch {
+      // A tainted canvas cannot be read; assume the stroke counts.
+      return true
+    }
+    return false
+  }
+
   const commit = () => {
     if (!drawing.current) return
     drawing.current = false
     lastPoint.current = null
+
     const canvas = canvasRef.current
-    if (canvas) onChange(canvas.toDataURL('image/png'))
+    if (!canvas) return
+
+    // A tap that leaves no mark — or a stroke that landed off-canvas because the
+    // page scrolled under the finger — must not be stored as a signature. An
+    // empty image on a signed-off docket is worse than no image at all.
+    if (!hasVisibleInk(canvas)) {
+      setHasInk(false)
+      onChange(null)
+      return
+    }
+
+    onChange(canvas.toDataURL('image/png'))
   }
 
   const clear = () => {

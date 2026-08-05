@@ -119,6 +119,23 @@ docker compose up -d / logs -f / down
   `responseType: 'blob'` so the JWT is attached. A plain `<a href>` to the API
   would be unauthenticated.
 
+## Uploads and reliability
+
+- Signatures and photos are the only thing that touches the filesystem, and the
+  only part that fails for environmental rather than input reasons. Media write
+  errors must surface as `StorageUnavailable` (503, transaction rolled back),
+  never a bare 500 — see `apps/dockets/serializers._write_children`.
+- `/api/health/` writes a probe file, so it reports whether uploads actually
+  work, and flags `media_persistent: false` when no Railway volume is mounted.
+- `entrypoint.sh` runs as root purely to fix ownership of a mounted volume,
+  then drops to `appuser` with `setpriv`. Do not add a `USER` line to the prod
+  stage — it would break the volume fix-up.
+- reportlab's `Image` is lazy. Always load upload bytes through
+  `pdf._image_flowable`, which reads them eagerly inside a try/except; passing
+  a path means a single missing file kills the whole export at `doc.build()`.
+- Row totals on category dockets are recomputed server-side from `amounts`; the
+  client's value is never trusted.
+
 ## Gotchas
 
 - `backend/entrypoint.sh` must stay executable on the host (`chmod +x`) — the

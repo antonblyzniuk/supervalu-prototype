@@ -168,6 +168,14 @@ MEDIA_ROOT = env("DJANGO_MEDIA_ROOT", default=str(BASE_DIR / "media"))
 # object storage (S3/R2) before this carries real traffic.
 SERVE_MEDIA_FILES = env.bool("DJANGO_SERVE_MEDIA", default=True)
 
+# A docket is posted as one JSON document with its signatures and photos inline
+# as base64, so the request body is far bigger than a plain form. Django's
+# 2.5 MB default rejected a docket with a few photos before any view ran.
+DATA_UPLOAD_MAX_MEMORY_SIZE = env.int("DJANGO_DATA_UPLOAD_MAX", default=32 * 1024 * 1024)
+FILE_UPLOAD_MAX_MEMORY_SIZE = env.int("DJANGO_FILE_UPLOAD_MAX", default=16 * 1024 * 1024)
+# Each line is an object with ~14 keys; 200 lines plus photos stays well under.
+DATA_UPLOAD_MAX_NUMBER_FIELDS = env.int("DJANGO_DATA_UPLOAD_MAX_FIELDS", default=10_000)
+
 # --------------------------------------------------------------------------
 # DRF
 # --------------------------------------------------------------------------

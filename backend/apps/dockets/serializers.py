@@ -1,8 +1,11 @@
+import logging
 from decimal import Decimal, InvalidOperation
 
+from django.conf import settings
 from django.db import transaction
 from rest_framework import serializers
 
+from apps.core.exceptions import StorageUnavailable
 from apps.stores.models import Store
 from apps.stores.serializers import StoreSerializer
 
@@ -10,7 +13,14 @@ from . import constants
 from .fields import Base64ImageField
 from .models import Docket, DocketLine, DocketPhoto, DocketSignature
 
+logger = logging.getLogger(__name__)
+
+# Docket.total is DecimalField(max_digits=12, decimal_places=2); anything at or
+# above this would overflow the column and surface as a database error.
+MAX_AMOUNT = Decimal("9999999999.99")
+
 MAX_LINES = 200
+MAX_PHOTOS = 24
 
 
 class DocketLineSerializer(serializers.ModelSerializer):
@@ -40,10 +50,20 @@ class DocketLineSerializer(serializers.ModelSerializer):
             if raw in (None, ""):
                 continue
             try:
-                cleaned[key] = str(Decimal(str(raw)).quantize(Decimal("0.01")))
-            except (InvalidOperation, ValueError) as exc:
+                amount = Decimal(str(raw).strip().replace(",", ""))
+            except (InvalidOperation, ValueError, TypeError) as exc:
                 raise serializers.ValidationError(f"'{key}' is not a valid amount.") from exc
+            if not amount.is_finite():
+                raise serializers.ValidationError(f"'{key}' is not a valid amount.")
+            if abs(amount) > MAX_AMOUNT:
+                raise serializers.ValidationError(f"'{key}' is too large.")
+            cleaned[key] = str(amount.quantize(Decimal("0.01")))
         return cleaned
+
+    def validate_total(self, value):
+        if value is not None and abs(value) > MAX_AMOUNT:
+            raise serializers.ValidationError("Total is too large.")
+        return value
 
 
 class DocketSignatureSerializer(serializers.ModelSerializer):
@@ -168,12 +188,29 @@ class DocketSerializer(serializers.ModelSerializer):
                 errors["lines"] = f"A docket cannot hold more than {MAX_LINES} lines."
             else:
                 allowed = set(constants.category_keys(docket_type))
+                running = Decimal("0.00")
                 for index, line in enumerate(lines):
                     unknown = set(line.get("amounts", {})) - allowed
                     if unknown:
                         errors[f"lines[{index}].amounts"] = (
                             f"Unknown columns for a {docket_type} docket: {sorted(unknown)}"
                         )
+                    # For a category register the row total is the sum of its
+                    # columns by definition, so derive it rather than trusting
+                    # whatever the client sent.
+                    if docket_type in constants.CATEGORY_TYPES:
+                        line["total"] = sum(
+                            (Decimal(v) for v in line.get("amounts", {}).values()),
+                            Decimal("0.00"),
+                        )
+                    running += line.get("total") or Decimal("0.00")
+
+                if abs(running) > MAX_AMOUNT:
+                    errors["lines"] = "The docket total is too large to store."
+
+        photos = attrs.get("photos")
+        if photos is not None and len(photos) > MAX_PHOTOS:
+            errors["photos"] = f"A docket cannot hold more than {MAX_PHOTOS} photos."
 
         roles = attrs.get("signatures")
         if roles is not None:
@@ -232,10 +269,17 @@ class DocketSerializer(serializers.ModelSerializer):
                 for index, line in enumerate(lines)
             ]
         )
-        for signature in signatures:
-            DocketSignature.objects.create(docket=docket, **signature)
-        for photo in photos:
-            DocketPhoto.objects.create(docket=docket, **photo)
+        # Writing images is the only step that can fail on infrastructure rather
+        # than input. Surface that as a 503 so the transaction rolls back and
+        # the user is told the docket was not saved, instead of a bare 500.
+        try:
+            for signature in signatures:
+                DocketSignature.objects.create(docket=docket, **signature)
+            for photo in photos:
+                DocketPhoto.objects.create(docket=docket, **photo)
+        except OSError as exc:
+            logger.error("Could not write docket upload to %s: %s", settings.MEDIA_ROOT, exc)
+            raise StorageUnavailable() from exc
 
 
 class DocketListSerializer(serializers.ModelSerializer):

@@ -5,6 +5,7 @@ bytes come out on every device — a manager exporting from an iPad gets the fil
 the office gets — and lets the export honour the exact same filters as the list.
 """
 
+import logging
 from decimal import Decimal
 from io import BytesIO
 
@@ -27,6 +28,8 @@ from reportlab.platypus import (
 
 from . import constants
 from .reports import build_summary
+
+logger = logging.getLogger(__name__)
 
 BRAND = colors.HexColor("#C8102E")
 BRAND_DARK = colors.HexColor("#8E0B20")
@@ -235,15 +238,35 @@ def _meta_table(docket):
     return table
 
 
+def _image_flowable(field_file, width, height):
+    """Load an uploaded image eagerly, or return None if it cannot be read.
+
+    reportlab's Image is lazy by default: passing it a path defers opening the
+    file until doc.build(), long after any try/except around construction. A
+    single missing file — say, uploads lost when a deploy wiped the volume —
+    would then blow up the entire export with a 500. Reading the bytes here
+    keeps the failure local to one image, and works with any storage backend
+    rather than assuming a local filesystem path.
+    """
+    try:
+        with field_file.open("rb") as handle:
+            data = BytesIO(handle.read())
+        return Image(data, width=width, height=height, kind="proportional", lazy=0)
+    except Exception:  # noqa: BLE001 - any unreadable image degrades to a note
+        logger.warning("Skipping unreadable docket image: %s", getattr(field_file, "name", "?"))
+        return None
+
+
 def _signature_strip(docket):
     signatures = list(docket.signatures.all())
     if not signatures:
         return None
     cells, labels = [], []
     for signature in signatures:
-        try:
-            cells.append(Image(signature.image.path, width=42 * mm, height=15 * mm, kind="proportional"))
-        except Exception:  # noqa: BLE001 - a missing file must not kill the export
+        image = _image_flowable(signature.image, 42 * mm, 15 * mm)
+        if image is not None:
+            cells.append(image)
+        else:
             cells.append(Paragraph("<i>signature unavailable</i>", S_CELL))
         role = signature.get_role_display()
         name = f" · {signature.signed_name}" if signature.signed_name else ""
@@ -269,10 +292,9 @@ def _photo_strip(docket):
         return None
     cells = []
     for photo in photos[:6]:
-        try:
-            cells.append(Image(photo.image.path, width=34 * mm, height=34 * mm, kind="proportional"))
-        except Exception:  # noqa: BLE001
-            continue
+        image = _image_flowable(photo.image, 34 * mm, 34 * mm)
+        if image is not None:
+            cells.append(image)
     if not cells:
         return None
     table = Table([cells], colWidths=[38 * mm] * len(cells), hAlign="LEFT")

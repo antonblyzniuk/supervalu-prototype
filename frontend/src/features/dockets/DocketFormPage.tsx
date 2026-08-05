@@ -9,7 +9,7 @@ import { Tabs } from '@/components/ui/Tabs'
 import { useToast } from '@/components/ui/useToast'
 import { useAuth } from '@/features/auth/useAuth'
 import { useStores } from '@/features/stores/hooks'
-import { apiErrorMessage } from '@/lib/apiClient'
+import { apiErrorMessage, fieldErrorsFrom } from '@/lib/apiClient'
 
 import { CategoryLineTable } from './components/CategoryLineTable'
 import { ItemLineTable } from './components/ItemLineTable'
@@ -46,6 +46,7 @@ export function DocketFormPage() {
   const [draft, setDraft] = useState<DocketDraft | null>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [formError, setFormError] = useState<string | null>(null)
+  const [dirty, setDirty] = useState(false)
 
   const createMutation = useCreateDocket()
   const updateMutation = useUpdateDocket(id ?? '')
@@ -68,6 +69,15 @@ export function DocketFormPage() {
     [metaQuery.data, draft?.docket_type],
   )
 
+  // A half-filled docket represents real counting work — warn before losing it
+  // to a stray tab close or back gesture.
+  useEffect(() => {
+    if (!dirty) return
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault()
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [dirty])
+
   const runningTotal = useMemo(
     () => (draft?.lines ?? []).reduce((sum, line) => sum + (Number(line.total) || 0), 0),
     [draft?.lines],
@@ -87,7 +97,11 @@ export function DocketFormPage() {
   const stores = storesQuery.data ?? []
   // Staff file for their own store only; the API enforces the same rule.
   const canChooseStore = Boolean(user?.is_manager)
-  const patch = (changes: Partial<DocketDraft>) => setDraft({ ...draft, ...changes })
+
+  const patch = (changes: Partial<DocketDraft>) => {
+    setDirty(true)
+    setDraft({ ...draft, ...changes })
+  }
 
   const changeType = (nextType: DocketType) => {
     // Switching type changes the whole column set, so restart from a clean sheet.
@@ -111,8 +125,13 @@ export function DocketFormPage() {
     const next: DocketSignature = existing
       ? { ...existing, signed_name }
       : { role, signed_name, image: '' }
-    patch({ signatures: next.image ? [...others, next] : draft.signatures })
-    if (role === 'manager') patch({ manager_name: signed_name })
+
+    // One patch, not two: `patch` spreads the current `draft`, so a second call
+    // in the same handler would discard the first one's changes.
+    patch({
+      signatures: next.image ? [...others, next] : draft.signatures,
+      ...(role === 'manager' ? { manager_name: signed_name } : {}),
+    })
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -136,9 +155,15 @@ export function DocketFormPage() {
         `${DOCKET_TYPE_LABELS[saved.docket_type]} docket ${isEditing ? 'updated' : 'saved'} · ${saved.store_detail.name}`,
         'success',
       )
+      setDirty(false)
       navigate(`/dockets/${saved.id}`)
     } catch (error) {
+      // Surface server-side field errors on the fields themselves; the server
+      // validates more than the client does, so this is not just a mirror.
+      const serverErrors = fieldErrorsFrom(error)
+      if (Object.keys(serverErrors).length) setErrors(serverErrors)
       setFormError(apiErrorMessage(error, 'Could not save the docket.'))
+      window.scrollTo({ top: 0, behavior: 'smooth' })
     }
   }
 
