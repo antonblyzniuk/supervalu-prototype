@@ -13,6 +13,25 @@ browser → frontend (nginx + SPA) ──proxy──> backend (gunicorn) → Pos
                                                     └─ volume: /data/media
 ```
 
+> ### Set **Root Directory** on both services — do this first
+>
+> | Service | Root Directory |
+> | --- | --- |
+> | backend | `backend` |
+> | frontend | `frontend` |
+>
+> Railway → service → **Settings → Source → Root Directory**.
+>
+> This is what sets the Docker **build context**. Each Dockerfile copies files
+> relative to its own folder (`COPY nginx.conf.template`, `COPY package.json`),
+> so with the repo root as context those paths do not exist and the build dies
+> with `"/nginx.conf.template": not found`.
+>
+> Do **not** instead set "Dockerfile Path" to `frontend/Dockerfile` and leave
+> Root Directory empty — that points Railway at the right Dockerfile but keeps
+> the wrong context, which is exactly the failure above. Setting Root Directory
+> also makes Railway pick up that folder's `railway.json`.
+
 ---
 
 ## 1. Postgres
@@ -22,9 +41,9 @@ which is the only database variable the backend needs.
 
 ## 2. Backend service
 
-Create a service from this repo and set **Root Directory** to `backend`. Railway
-picks up `backend/railway.json` (Dockerfile builder, health check on
-`/api/health/`).
+Create a service from this repo and set **Root Directory** to `backend` (see the
+note above — the build fails without it). Railway then picks up
+`backend/railway.json`: Dockerfile builder, health check on `/api/health/`.
 
 Variables:
 
@@ -74,7 +93,8 @@ needed at boot.
 
 ## 3. Frontend service
 
-Create a second service from the same repo with **Root Directory** `frontend`.
+Create a second service from the same repo with **Root Directory** set to
+`frontend` — again, the build fails without it.
 
 | Variable | Value |
 | --- | --- |
@@ -122,6 +142,20 @@ Then sign in and check that a docket's signature image renders — that exercise
 the media volume, the proxy and the relative-URL handling in one go.
 
 ## Troubleshooting
+
+**Build fails with `"/nginx.conf.template": not found`** (or
+`"/package-lock.json"`, or `"/requirements.txt"`) — the build context is the
+repo root instead of the service folder. Set **Root Directory** to `frontend`
+(or `backend`) as described at the top, and clear any "Dockerfile Path"
+override so it stays the default `Dockerfile`.
+
+Reproduce and confirm the same thing locally:
+
+```bash
+docker build -f frontend/Dockerfile --target prod .          # fails, wrong context
+docker build -f frontend/Dockerfile --target prod ./frontend  # succeeds
+```
+
 
 **Redirect loop / `ERR_TOO_MANY_REDIRECTS`** — Django's `SECURE_SSL_REDIRECT` is
 on whenever `DJANGO_DEBUG=False`. nginx forwards the edge's `X-Forwarded-Proto`,
