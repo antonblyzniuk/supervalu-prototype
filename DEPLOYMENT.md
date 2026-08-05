@@ -109,11 +109,35 @@ requires a rebuild, which is exactly why the default keeps everything relative.
 
 ## 4. First run
 
-Generate the domains for both services, then create the first admin:
+Generate the domains for both services, then create the first admin **inside the
+running container**:
 
 ```bash
-railway run --service backend python manage.py createsuperuser
+railway link                      # select the project
+railway ssh --service backend
+# then, in the container:
+python manage.py createsuperuser
 ```
+
+It asks for an email and password; the account is created with the `admin`
+role, which sees every store.
+
+> `railway run ... createsuperuser` does **not** work here. `railway run`
+> executes on your own machine with Railway's variables injected, and
+> `DATABASE_URL` points at `RAILWAY_PRIVATE_DOMAIN` — a hostname that only
+> resolves inside Railway's network.
+
+Non-interactive alternative, if you would rather not use a shell (run it as a
+one-off command on the service, or over `railway ssh`):
+
+```bash
+DJANGO_SUPERUSER_EMAIL=you@moriartygroup.ie \
+DJANGO_SUPERUSER_PASSWORD='<a strong password>' \
+python manage.py createsuperuser --noinput
+```
+
+Change that password after the first sign-in — it is visible in your shell
+history and in Railway's logs.
 
 Sign in at `https://<frontend-domain>/`, open **Team**, and add colleagues with
 their store assignments. A staff account with no store assigned can see nothing
