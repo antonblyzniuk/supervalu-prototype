@@ -13,6 +13,22 @@ npm-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Django
+backend/staticfiles/
+backend/media/
+db.sqlite3
+
 # Env / secrets
 .env
 .env.*

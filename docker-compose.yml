@@ -1,0 +1,86 @@
+name: supervalu
+
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: supervalu-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-supervalu}
+      POSTGRES_USER: ${POSTGRES_USER:-supervalu}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-supervalu}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      # Host-side port only; services talk to `db:5432` on the compose network.
+      - "${POSTGRES_PORT:-5433}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-supervalu} -d ${POSTGRES_DB:-supervalu}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      target: ${BACKEND_TARGET:-dev}
+    container_name: supervalu-backend
+    restart: unless-stopped
+    command: python manage.py runserver 0.0.0.0:8000
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-insecure-dev-key-change-me}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-True}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,backend}
+      DJANGO_LOG_LEVEL: ${DJANGO_LOG_LEVEL:-INFO}
+      DATABASE_URL: postgres://${POSTGRES_USER:-supervalu}:${POSTGRES_PASSWORD:-supervalu}@db:5432/${POSTGRES_DB:-supervalu}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+      # Only meaningful when DJANGO_DEBUG=False; set False to smoke-test the
+      # prod target locally over plain http.
+      SECURE_SSL_REDIRECT: ${SECURE_SSL_REDIRECT:-True}
+      COLLECT_STATIC: ${COLLECT_STATIC:-0}
+      DJANGO_MEDIA_ROOT: ${DJANGO_MEDIA_ROOT:-/app/media}
+    volumes:
+      - ./backend:/app
+      - static_data:/app/staticfiles
+      - media_data:/app/media
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/api/health/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  frontend:
+    build:
+      context: ./frontend
+      target: ${FRONTEND_TARGET:-dev}
+    container_name: supervalu-frontend
+    restart: unless-stopped
+    environment:
+      # Requests go to the Vite dev-server proxy, which forwards to `backend`.
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+      VITE_PROXY_TARGET: http://backend:8000
+      # The prod target is nginx, which reads PORT. Pinning it to 5173 keeps the
+      # published port identical whichever target is built.
+      PORT: 5173
+      BACKEND_ORIGIN: http://backend:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  static_data:
+  media_data:

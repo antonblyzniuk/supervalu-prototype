@@ -1,0 +1,93 @@
+/* Moriarty Group design tokens — the single source of colour, type and spacing.
+   Every component styles itself from these; nothing hardcodes a hex value. */
+
+:root {
+  color-scheme: light;
+
+  /* Brand */
+  --brand: #c8102e;
+  --brand-dark: #8e0b20;
+  --brand-soft: #fbe9ec;
+  --brand-contrast: #ffffff;
+
+  /* Surfaces */
+  --bg: #f4f5f0;
+  --surface: #ffffff;
+  --surface-sunken: #f8f9f6;
+  --overlay: rgb(16 18 15 / 55%);
+
+  /* Ink */
+  --text: #1a1f18;
+  --text-muted: #6b7266;
+  --text-subtle: #949b90;
+
+  /* Lines */
+  --border: #d8dbd2;
+  --border-strong: #b9bfb2;
+
+  /* Status */
+  --success: #2e7d32;
+  --success-soft: #e8f5e9;
+  --warning: #e65100;
+  --warning-soft: #fff3e0;
+  --info: #1565c0;
+  --info-soft: #e3f2fd;
+  --danger: #b3261e;
+  --danger-soft: #fdecea;
+  --accent-violet: #6a1b9a;
+  --accent-violet-soft: #f3e5f5;
+
+  /* Type */
+  --font-sans:
+    'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+
+  --text-2xs: 0.625rem;
+  --text-xs: 0.6875rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.9375rem;
+  --text-lg: 1.0625rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+
+  /* Space */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+
+  /* Shape */
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+
+  --shadow-sm: 0 1px 2px rgb(16 18 15 / 6%);
+  --shadow: 0 2px 12px rgb(16 18 15 / 8%);
+  --shadow-lg: 0 12px 32px rgb(16 18 15 / 18%);
+
+  --header-height: 56px;
+  --content-max: 1240px;
+
+  --focus-ring: 0 0 0 3px rgb(200 16 46 / 25%);
+  --transition: 140ms ease;
+}
+
+/* Respect users who ask for less motion — animations become instant. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --transition: 0ms;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,0 +1,64 @@
+# Rendered by the nginx image's envsubst entrypoint at container start.
+# Only ${PORT} and ${BACKEND_ORIGIN} are substituted (see NGINX_ENVSUBST_FILTER
+# in the Dockerfile) so nginx's own $host / $uri variables survive intact.
+#
+# The frontend proxies the API rather than calling it cross-origin. That keeps
+# the whole app same-origin in production: no CORS, and the relative /media
+# URLs the API returns for signatures and photos resolve correctly.
+
+# Railway (and any load balancer) terminates TLS in front of this container, so
+# nginx itself sees plain http. Pass the edge's X-Forwarded-Proto through when
+# it exists — otherwise Django's SSL redirect would bounce forever.
+map $http_x_forwarded_proto $forwarded_proto {
+    default $http_x_forwarded_proto;
+    ""      $scheme;
+}
+
+server {
+    listen ${PORT};
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+    gzip_min_length 1024;
+
+    # Docket photos are uploaded inline as base64, so payloads run large.
+    client_max_body_size 25m;
+
+    location ~ ^/(api|admin|media|static)/ {
+        proxy_pass ${BACKEND_ORIGIN};
+
+        # $proxy_host, not $host: the backend must see its own hostname or
+        # Django's ALLOWED_HOSTS rejects the request.
+        proxy_set_header Host $proxy_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $forwarded_proto;
+
+        # Needed when the backend is reached over HTTPS (Railway, any CDN).
+        proxy_ssl_server_name on;
+
+        proxy_connect_timeout 10s;
+        proxy_read_timeout 120s;
+        proxy_redirect off;
+    }
+
+    # Hashed build assets never change under the same name.
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # The shell itself must never be cached, or a deploy serves stale JS.
+    location = /index.html {
+        add_header Cache-Control "no-store";
+    }
+
+    # SPA routing — unknown paths fall back to the app shell.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
