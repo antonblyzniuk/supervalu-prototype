@@ -38,6 +38,11 @@ if ON_RAILWAY:
     # its own Host header, so it must be allowed or every probe 400s and the
     # deploy never goes healthy.
     _railway_hosts.append("healthcheck.railway.app")
+    # Once a custom domain is attached, RAILWAY_PUBLIC_DOMAIN becomes that
+    # domain and the generated *.up.railway.app address stops being trusted —
+    # which breaks service-to-service calls that deliberately bypass the CDN.
+    # The namespace is Railway-controlled, so trusting it is safe.
+    _railway_hosts.extend([".up.railway.app", ".railway.internal"])
 
 for _domain in _railway_hosts:
     if _domain and _domain not in ALLOWED_HOSTS:

@@ -38,3 +38,30 @@ def test_health_is_content_with_a_mounted_volume(client, db, settings, monkeypat
 def test_schema_endpoint_is_reachable(client, db):
     response = client.get(reverse("schema"))
     assert response.status_code == 200
+
+
+def test_railway_generated_domain_stays_trusted_behind_a_custom_domain(client, db, settings):
+    """A custom domain must not stop the *.up.railway.app address working.
+
+    Attaching a custom domain makes Railway set RAILWAY_PUBLIC_DOMAIN to it, so
+    the generated address would otherwise drop out of ALLOWED_HOSTS — and that
+    is exactly the address the frontend proxies to, deliberately bypassing the
+    CDN to avoid a proxy loop.
+    """
+    settings.ALLOWED_HOSTS = [
+        "localhost",
+        "apisupervalu.example.com",
+        "healthcheck.railway.app",
+        ".up.railway.app",
+    ]
+
+    generated = client.get(
+        reverse("core:health"), headers={"host": "backend-production-c3ed.up.railway.app"}
+    )
+    assert generated.status_code == 200
+
+    custom = client.get(reverse("core:health"), headers={"host": "apisupervalu.example.com"})
+    assert custom.status_code == 200
+
+    # The wildcard is scoped to Railway's namespace, not opened up generally.
+    assert client.get(reverse("core:health"), headers={"host": "evil.example.com"}).status_code == 400
