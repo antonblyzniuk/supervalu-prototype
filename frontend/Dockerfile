@@ -46,9 +46,13 @@ FROM nginx:1.27-alpine AS prod
 
 # Substituted into the config at start-up. Railway overrides PORT itself;
 # BACKEND_ORIGIN must be set to the backend service's URL.
+# NGINX_ENTRYPOINT_LOCAL_RESOLVERS makes the image's 15-local-resolvers script
+# export NGINX_LOCAL_RESOLVERS from /etc/resolv.conf — it is opt-in, and the
+# config below needs it for the runtime-resolved upstream.
 ENV PORT=80 \
     BACKEND_ORIGIN=http://backend:8000 \
-    NGINX_ENVSUBST_FILTER='^(PORT|BACKEND_ORIGIN)$'
+    NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1 \
+    NGINX_ENVSUBST_FILTER='^(PORT|BACKEND_ORIGIN|NGINX_LOCAL_RESOLVERS)$'
 
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html

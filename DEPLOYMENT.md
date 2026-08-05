@@ -130,6 +130,9 @@ until a manager assigns one.
 4. Set the backend's `CSRF_TRUSTED_ORIGINS` / `CORS_ALLOWED_ORIGINS` to the
    frontend domain and redeploy the backend
 
+The order is a convenience, not a requirement — the frontend deploys and passes
+its health check whether or not the backend exists yet.
+
 ## Verifying a deploy
 
 ```bash
@@ -156,6 +159,18 @@ docker build -f frontend/Dockerfile --target prod .          # fails, wrong cont
 docker build -f frontend/Dockerfile --target prod ./frontend  # succeeds
 ```
 
+
+**Frontend healthcheck fails, logs show `host not found in upstream`** — this
+should no longer happen: the upstream is resolved at request time, so nginx
+starts even when `BACKEND_ORIGIN` points at something that does not exist yet.
+If you see it, the image predates that fix — redeploy from `main`.
+
+The frontend can be deployed before the backend exists. It serves the SPA
+normally and returns 502 on `/api` until `BACKEND_ORIGIN` points somewhere real.
+
+**Frontend is up but every API call returns 502** — `BACKEND_ORIGIN` is unset,
+wrong, or has a trailing slash. It must be the backend's full origin with no
+path: `https://backend-production-1234.up.railway.app`.
 
 **Redirect loop / `ERR_TOO_MANY_REDIRECTS`** — Django's `SECURE_SSL_REDIRECT` is
 on whenever `DJANGO_DEBUG=False`. nginx forwards the edge's `X-Forwarded-Proto`,

@@ -28,8 +28,19 @@ server {
     # Docket photos are uploaded inline as base64, so payloads run large.
     client_max_body_size 25m;
 
+    # Resolver populated by the image's 15-local-resolvers entrypoint script,
+    # which reads /etc/resolv.conf. Needed because the upstream below is a
+    # variable, which defers DNS to request time.
+    resolver ${NGINX_LOCAL_RESOLVERS} valid=30s;
+
     location ~ ^/(api|admin|media|static)/ {
-        proxy_pass ${BACKEND_ORIGIN};
+        # Held in a variable on purpose. With a literal hostname nginx resolves
+        # it while loading the config and exits with "host not found in
+        # upstream" if the backend is not up yet — which killed the whole
+        # frontend, static files included. As a variable, an unreachable
+        # backend is just a 502 on /api while the SPA keeps serving.
+        set $backend_origin ${BACKEND_ORIGIN};
+        proxy_pass $backend_origin$request_uri;
 
         # $proxy_host, not $host: the backend must see its own hostname or
         # Django's ALLOWED_HOSTS rejects the request.
