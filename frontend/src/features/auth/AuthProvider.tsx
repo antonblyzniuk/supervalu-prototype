@@ -1,3 +1,4 @@
+import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 
 import { tokenStore } from '@/lib/tokens'
@@ -26,8 +27,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then((me) => {
         if (!cancelled) setUser(me)
       })
-      .catch(() => {
-        if (!cancelled) tokenStore.clear()
+      .catch((error) => {
+        if (cancelled) return
+        // Only a rejection from the server clears the session. A restart or a
+        // dropped connection leaves the stored token perfectly good, and
+        // throwing it away signs everybody out over a blip — reloading once the
+        // server is back should just work.
+        if (axios.isAxiosError(error) && !error.response) return
+        tokenStore.clear()
       })
       .finally(() => {
         if (!cancelled) setLoading(false)

@@ -8,14 +8,14 @@ from .models import User
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
     ordering = ("email",)
-    list_display = ("email", "first_name", "last_name", "role", "store", "is_active")
-    list_filter = ("role", "store", "is_active", "is_staff", "is_superuser")
+    list_display = ("email", "first_name", "last_name", "role", "store", "department", "is_active")
+    list_filter = ("role", "store", "department", "is_active", "is_staff", "is_superuser")
     search_fields = ("email", "first_name", "last_name", "employee_id")
 
     fieldsets = (
         (None, {"fields": ("email", "password")}),
         (_("Personal info"), {"fields": ("first_name", "last_name", "phone")}),
-        (_("Work"), {"fields": ("role", "employee_id", "store")}),
+        (_("Work"), {"fields": ("role", "employee_id", "store", "department")}),
         (
             _("Permissions"),
             {
@@ -35,7 +35,7 @@ class UserAdmin(BaseUserAdmin):
             None,
             {
                 "classes": ("wide",),
-                "fields": ("email", "password1", "password2", "role", "store"),
+                "fields": ("email", "password1", "password2", "role", "store", "department"),
             },
         ),
     )

@@ -50,6 +50,10 @@ docker compose up -d / logs -f / down
   directly in a view.
 - A staff user with `store=None` sees nothing and cannot file. That is
   deliberate; the fix is a manager assigning them a store on `/team`.
+- Departments narrow it further: a staff user sees their own department in
+  their own store and nothing else — see the Departments section below. Their
+  store and their department's store are kept in step, so the two scopes can
+  never point at different branches.
 - Frontend locks (disabled store pickers, hidden "All stores", hidden Team nav)
   are UX only. The API is the boundary; add both when adding a scoped screen.
 - Only an admin can grant or revoke the admin role, and nobody can change their
@@ -63,6 +67,86 @@ docker compose up -d / logs -f / down
 - Emails are stored lower-cased and sign-in is case-insensitive
   (`apps/accounts/auth_serializers.py`). Keep new user-creation paths going
   through `UserManager.create_user` so that holds.
+
+## Departments
+
+Two levels, and the distinction is the whole feature:
+
+- `Department` is the *kind* — "the Deli", group-wide. Nobody is assigned to one.
+- `StoreDepartment` is that kind in one branch — "Deli · Balbriggan". This is
+  what `User.department` points at, so every roster is store specific.
+  Unique per `(department, store)`.
+
+Rolling the branches of one kind back up is what answers "the Deli in general";
+reading a single branch is what a staff user is allowed to see.
+
+- **A store runs a department or it does not, and that is the presence of a
+  `StoreDepartment` row.** There is deliberately no separate "closed" flag to
+  drift out of step with it. `DepartmentSerializer.create` opens a new kind in
+  the stores named in `store_slugs`, defaulting to all of them; after that an
+  admin adds and removes stores one at a time by POSTing to and DELETEing from
+  `/api/departments/in-stores/`. A newly added `Store` needs its branches
+  opened by hand.
+- `DepartmentSerializer.update` **drops `store_slugs`**. Which stores run a
+  department is only ever edited per store — a slug missing from a resubmitted
+  list must never silently delete a branch and its roster.
+- A branch's `department` and `store` are write-once: `get_fields` removes both
+  slug fields once there is an instance, because moving a branch would drag its
+  whole roster into a store those people do not work in.
+- Slugs are generated once and never regenerated (`build_unique_slug`), so a
+  rename keeps existing links working. A branch slug is
+  `<department>-at-<store>`, but nothing outside the API composes it — the
+  frontend resolves `/departments/:slug/:storeSlug` through
+  `useStoreDepartmentAt`, which filters the list endpoint.
+- Endpoints, both unpaginated reference data keyed by `slug`:
+  - `/api/departments/` — kinds, with `member_count`/`store_count` pooled across
+    branches. `IsManagerReadAdminWrite`: **staff get 403 on the whole
+    resource**, because pooling stores is exactly what they must not see.
+    Detail adds `stores` (the per-branch breakdown), `roles` and the combined
+    `members`.
+  - `/api/departments/in-stores/` — branches. Everyone signed in reads it, but
+    `get_queryset` narrows a staff user to `pk == user.department_id` — not
+    other departments in their store, not the same department elsewhere. Writes
+    are admin-only. `StoreDepartmentSerializer.Meta.validators` is emptied so
+    the friendly "Balbriggan already runs Deli" wins over DRF's auto
+    unique-together message; the database constraint is still the backstop.
+- `roles` is `{staff, manager, admin, total}` over **active** members, built by
+  `serializers.role_breakdown`. The same shape is reported for one branch and
+  for the group, so `RoleTiles` renders both.
+- Serializer choice is a query-count decision. `StoreDepartmentLabelSerializer`
+  (no counts) is what nests on a user — the counts read the roster, and a
+  25-row team page would otherwise fire 25 extra queries.
+  `StoreDepartmentRowSerializer` adds them and is only used where the viewset
+  prefetches `members` (see `views.member_prefetch`).
+- `User.department` is `PROTECT`, and nullable in the database only because
+  accounts predating it (and the bootstrap admin) have none.
+  `TeamMemberCreateSerializer` requires `department_slug`;
+  `TeamMemberSerializer` refuses to null it. Both go through
+  `accounts.serializers.department_field`, which only accepts a live branch of
+  a live kind.
+- **`store` and `department.store` must agree**, enforced by
+  `accounts.serializers.validate_store_matches_department`: picking a
+  department settles the store when there is none, a mismatched pair is
+  refused, and the store cannot be cleared out from under a department. The
+  Team page cooperates — moving somebody between stores sends the equivalent
+  branch of the same kind along with the store, and refuses in the UI when the
+  destination does not run it.
+- Both deletes refuse to orphan staff and 400 with the count:
+  `DepartmentViewSet.perform_destroy` counts across every branch (deleting a
+  kind cascades to them), `StoreDepartmentViewSet.perform_destroy` counts the
+  one store. Archiving the kind (`Department.is_active`) is the soft option;
+  for a single store, move the people and then remove it.
+- `DepartmentsIndex` is what `/departments` renders: the group list for a
+  manager, a redirect to their own branch for a staff user, an empty state for
+  a staff user with no department.
+- The group page's "By store" table lists **every** store, joining
+  `useStores()` to `department.stores`, so the ones that do not run it are
+  where an admin presses "Open here". That is also why it is not a
+  `table--rows-clickable`: half the rows have no page to open.
+- Both detail pages build their Details card from one `meta` array, so a new
+  serializer field is one line there and nothing else.
+- Not to be confused with `Docket.department`, a free-text field on transfer
+  dockets. The two are unrelated for now.
 
 ## The dockets feature
 
@@ -86,6 +170,82 @@ docker compose up -d / logs -f / down
   content negotiation and returns 404 for an unknown renderer.
 - PDF rendering is server-side (ReportLab, `apps/dockets/pdf.py`). Do not add a
   browser-side PDF library.
+
+## Rosters
+
+- `apps/rosters` has exactly one model, `Shift`. **There is no roster record** —
+  a roster is this table read for one store and one trading week, which is why
+  a manager can open any week and start filling it in with nothing to create
+  first, and why there is no draft state to get stuck in.
+- One shift per person per day (`one_shift_per_person_per_day`). Split shifts
+  would need that constraint lifted *and* the board's one-cell-per-day layout
+  rethought.
+- The week is the same Sunday→Saturday trading week as the top sheets —
+  `apps.dockets.filters.week_start` is imported rather than redefined.
+- The arithmetic lives on the model and is **never accepted from a client**:
+  - `duration_minutes` — clock-in to clock-out. An end at or before the start
+    reads as finishing the next day, so a 22:00–02:00 close is four hours.
+  - `paid_minutes` — the span less the break, unless `break_paid`.
+  - `cost` — `paid_minutes × effective_hourly_rate`, rounded **per shift**, so a
+    total always equals the rows printed above it.
+  `serializers.totals_for` returns the same `{shift_count, paid_minutes, hours,
+  cost}` block for a person, a department and a store, so one component renders
+  all three. The frontend's `paidMinutesOf` mirrors the span/break maths for the
+  editor's live preview only.
+- `User.hourly_rate` is nullable; `User.effective_hourly_rate` falls back to
+  `settings.MINIMUM_HOURLY_RATE` (env `MINIMUM_HOURLY_RATE`, €14.20). Costing an
+  unrated account at zero would be worse than useless, so it never happens.
+  **Only an admin sets pay** (`validate_hourly_rate` on both team serializers),
+  and never below the minimum. Managers read it because the roster prices their
+  week off it.
+- Cost uses the person's rate *now*, not a snapshot taken when the shift was
+  written — a roster is a forward-looking plan, so a rate change is meant to
+  reprice it. Change that if rosters ever become a payroll record.
+- `GET /api/rosters/board/?store=&week=` assembles the week: every department
+  the store runs, everyone who works there (managers included, unrostered people
+  with a zero week, anyone department-less grouped last), and the totals.
+  `/api/rosters/shifts/` is plain CRUD. Both are `IsManager` — a roster carries
+  what everybody is paid, so staff cannot see one at all.
+- `ShiftSerializer.Meta.validators` is emptied for the same reason as the
+  departments one: DRF's auto unique-together message is unreadable, so
+  `validate` names the person and the day instead.
+- **Every rostered hour must belong to a visible row.** `Shift.store` is
+  denormalised from `user.store`, so somebody who transfers or is deactivated
+  keeps their shifts at the branch they worked. `collect_board` therefore adds
+  anyone holding a shift that week back onto the board, and `build_board` files
+  a person under a department only when that department is one this store runs
+  — otherwise the store total would be quietly larger than the rows under it.
+  There are tests pinning that reconciliation; keep them.
+- `GET /api/rosters/export/?store=&week=&department=&output=pdf|json` renders
+  the week, whole store or a few departments (`?department=deli,bakery` or
+  repeated). Narrowing recomputes the totals from the kept departments only, so
+  a one-department PDF reports that department's wage bill, not the store's.
+  Screen and export both go through `collect_board`, so a download can never
+  disagree with what the manager was looking at.
+- **A board group carries two slugs and they are not interchangeable.** `slug`
+  is the branch (`deli-at-balbriggan`); `department_slug` is the kind (`deli`),
+  and the kind is what the export filters on. Sending the branch slug used to
+  produce a perfectly valid-looking PDF of nobody, so the export now 400s on a
+  slug the store does not run rather than exporting an empty week.
+- `apps/rosters/pdf.py` imports its palette from `apps.dockets.pdf` so both
+  exports print as the same organisation. Landscape A4, one table per
+  department, header row repeated when a department splits across pages.
+
+## Tables
+
+- `.table th` and `.grid-table th` set a default `text-align`, and both
+  out-specify a bare `.u-right` utility. `components.css` restates
+  `.table th.u-right` / `.table th.u-center` for that reason — without them a
+  right-aligned numeric heading silently reverts to left while its figures stay
+  right, which is what every money column in the app used to do. **Any new
+  alignment utility used on a `th` needs the same treatment.**
+- Cells need no such override: `.table td` sets no alignment, so the utility
+  already wins, and the stacked mobile layout (`.table--stacked td`) overrides
+  them on purpose.
+- `table--stacked` turns rows into cards on a phone and draws each cell's label
+  from `data-label`. A cell whose label would read as nonsense — a `colSpan`
+  spanning several columns, an action button — should simply omit `data-label`
+  and take the full width.
 
 ## Frontend conventions
 
