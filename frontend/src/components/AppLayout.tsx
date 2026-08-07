@@ -12,6 +12,8 @@ interface NavItem {
 const NAV: NavItem[] = [
   { to: '/', label: 'Home' },
   { to: '/dockets', label: 'Dockets' },
+  { to: '/departments', label: 'Departments' },
+  { to: '/roster', label: 'Roster', managerOnly: true },
   { to: '/team', label: 'Team', managerOnly: true },
 ]
 

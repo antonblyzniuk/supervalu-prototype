@@ -4,6 +4,7 @@ Configuration is environment-driven (see `.env.example` at the repo root).
 """
 
 from datetime import timedelta
+from decimal import Decimal
 from pathlib import Path
 
 import environ
@@ -73,7 +74,9 @@ LOCAL_APPS = [
     "apps.accounts",
     "apps.core",
     "apps.stores",
+    "apps.departments",
     "apps.dockets",
+    "apps.rosters",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -134,6 +137,11 @@ AUTH_USER_MODEL = "accounts.User"
 # /api/auth/bootstrap-admin/. Leave it unset and the endpoint is disabled —
 # which is what it should be once the first admin exists.
 ADMIN_BOOTSTRAP_CODE = env("ADMIN_BOOTSTRAP_CODE", default="")
+
+# National minimum wage, in euro per hour. Used as the rate for anyone an admin
+# has not given an explicit one, and as the floor that a rate is validated
+# against — raise it when the statutory rate changes.
+MINIMUM_HOURLY_RATE = Decimal(env("MINIMUM_HOURLY_RATE", default="14.20"))
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},

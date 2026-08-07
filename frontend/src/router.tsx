@@ -4,11 +4,15 @@ import { AppLayout } from '@/components/AppLayout'
 import { ManagerRoute, ProtectedRoute } from '@/components/ProtectedRoute'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { SetupAdminPage } from '@/features/auth/SetupAdminPage'
+import { DepartmentDetailPage } from '@/features/departments/DepartmentDetailPage'
+import { DepartmentsIndex } from '@/features/departments/DepartmentsIndex'
+import { StoreDepartmentPage } from '@/features/departments/StoreDepartmentPage'
 import { DocketDetailPage } from '@/features/dockets/DocketDetailPage'
 import { DocketFormPage } from '@/features/dockets/DocketFormPage'
 import { DocketListPage } from '@/features/dockets/DocketListPage'
 import { DocketsSection } from '@/features/dockets/DocketsSection'
 import { TopSheetPage } from '@/features/dockets/TopSheetPage'
+import { RosterPage } from '@/features/rosters/RosterPage'
 import { TeamPage } from '@/features/team/TeamPage'
 import { HomePage } from '@/pages/HomePage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
@@ -36,9 +40,25 @@ export const router = createBrowserRouter([
               { path: ':id/edit', element: <DocketFormPage /> },
             ],
           },
+          // Open to everyone, but what you get depends on your role: managers
+          // see the group-wide roll-up, staff only their own branch. The API
+          // enforces both — these routes just avoid rendering a dead end.
+          {
+            path: 'departments',
+            children: [
+              { index: true, element: <DepartmentsIndex /> },
+              { path: ':slug', element: <DepartmentDetailPage /> },
+              { path: ':slug/:storeSlug', element: <StoreDepartmentPage /> },
+            ],
+          },
           {
             element: <ManagerRoute />,
-            children: [{ path: 'team', element: <TeamPage /> }],
+            children: [
+              { path: 'team', element: <TeamPage /> },
+              // Rosters price everybody's week, so they sit behind the same
+              // gate as staff administration.
+              { path: 'roster', element: <RosterPage /> },
+            ],
           },
           { path: '*', element: <NotFoundPage /> },
         ],

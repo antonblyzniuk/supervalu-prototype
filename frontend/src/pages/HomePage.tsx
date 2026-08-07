@@ -18,6 +18,7 @@ export function HomePage() {
 
   const name = user?.first_name || user?.full_name || user?.email?.split('@')[0] || 'there'
   const storeLabel = user?.store?.name ?? (user?.is_manager ? 'All stores' : 'No store assigned')
+  const departmentLabel = user?.department?.department.name
 
   return (
     <div className="u-stack">
@@ -26,7 +27,8 @@ export function HomePage() {
           {timeOfDayGreeting(now)}, {name}
         </h1>
         <p className="greeting__sub">
-          {storeLabel} · {weekLabel(now)}
+          {storeLabel}
+          {departmentLabel ? ` · ${departmentLabel}` : ''} · {weekLabel(now)}
         </p>
       </div>
 
@@ -68,6 +70,18 @@ export function HomePage() {
               icon="👥"
               title="Team"
               description="Assign staff to stores and manage access."
+            />
+            <ActionCard
+              to="/roster"
+              icon="🗓️"
+              title="Roster"
+              description="Plan the week and see what it costs."
+            />
+            <ActionCard
+              to="/departments"
+              icon="🏷️"
+              title="Departments"
+              description="Every department, per store and pooled across the group."
             />
             <ActionCard
               to="/dockets/top-sheet"

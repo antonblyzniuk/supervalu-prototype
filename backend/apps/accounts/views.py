@@ -78,8 +78,18 @@ class TeamViewSet(viewsets.ModelViewSet):
     """
 
     permission_classes = (IsManager,)
-    queryset = User.objects.select_related("store").order_by("email")
-    filterset_fields = ("role", "is_active", "store__slug")
+    queryset = User.objects.select_related(
+        "store", "department", "department__department", "department__store"
+    ).order_by("email")
+    # `department__slug` narrows to one branch ("Deli · Balbriggan");
+    # `department__department__slug` to a department across every branch.
+    filterset_fields = (
+        "role",
+        "is_active",
+        "store__slug",
+        "department__slug",
+        "department__department__slug",
+    )
     search_fields = ("email", "first_name", "last_name", "employee_id")
     ordering_fields = ("email", "role", "date_joined", "last_login")
 

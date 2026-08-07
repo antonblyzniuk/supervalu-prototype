@@ -5,6 +5,7 @@ import { Field } from '@/components/ui/Field'
 import { Modal } from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/useToast'
 import { useAuth } from '@/features/auth/useAuth'
+import { useStoreDepartments } from '@/features/departments/hooks'
 import { apiErrorMessage } from '@/lib/apiClient'
 import type { Store, UserRole } from '@/types/api'
 
@@ -20,6 +21,7 @@ interface MemberFormModalProps {
 }
 
 interface FormState {
+  hourly_rate: string
   email: string
   first_name: string
   last_name: string
@@ -27,11 +29,13 @@ interface FormState {
   employee_id: string
   phone: string
   store_slug: string
+  department_slug: string
   is_active: boolean
   password: string
 }
 
 const EMPTY: FormState = {
+  hourly_rate: '',
   email: '',
   first_name: '',
   last_name: '',
@@ -39,6 +43,7 @@ const EMPTY: FormState = {
   employee_id: '',
   phone: '',
   store_slug: '',
+  department_slug: '',
   is_active: true,
   password: '',
 }
@@ -48,6 +53,12 @@ export function MemberFormModal({ open, mode, member, stores, onClose }: MemberF
   const { user } = useAuth()
   const [form, setForm] = useState<FormState>(EMPTY)
   const [error, setError] = useState<string | null>(null)
+
+  // A department belongs to one store, so the picker follows the store field
+  // rather than the colleague's saved store — and it only lists the departments
+  // that store actually runs.
+  const branches = useStoreDepartments().data ?? []
+  const departments = branches.filter((branch) => branch.store.slug === form.store_slug)
 
   const createMutation = useCreateTeamMember()
   const updateMutation = useUpdateTeamMember()
@@ -67,6 +78,8 @@ export function MemberFormModal({ open, mode, member, stores, onClose }: MemberF
             employee_id: member.employee_id,
             phone: member.phone,
             store_slug: member.store?.slug ?? '',
+            department_slug: member.department?.slug ?? '',
+            hourly_rate: member.hourly_rate ?? '',
             is_active: member.is_active,
             password: '',
           }
@@ -74,8 +87,17 @@ export function MemberFormModal({ open, mode, member, stores, onClose }: MemberF
     )
   }, [open, mode, member])
 
+  /** Moving them to another store invalidates the department they were in. */
+  function changeStore(storeSlug: string) {
+    const stillValid = branches.some(
+      (branch) => branch.slug === form.department_slug && branch.store.slug === storeSlug,
+    )
+    patch({ store_slug: storeSlug, department_slug: stillValid ? form.department_slug : '' })
+  }
+
   const isSelf = mode === 'edit' && member?.id === user?.id
   const canGrantAdmin = user?.role === 'admin'
+  const canSetPay = user?.role === 'admin'
   const patch = (changes: Partial<FormState>) => setForm((current) => ({ ...current, ...changes }))
 
   async function handleSubmit(event: FormEvent) {
@@ -92,6 +114,10 @@ export function MemberFormModal({ open, mode, member, stores, onClose }: MemberF
           employee_id: form.employee_id,
           phone: form.phone,
           store_slug: form.store_slug || null,
+          department_slug: form.department_slug,
+          // Pay is an admin's field; the API refuses it from a manager, so it
+          // is only ever sent when one is actually filling the form in.
+          ...(canSetPay ? { hourly_rate: form.hourly_rate || null } : {}),
           password: form.password,
         })
         toast.push(`${form.email.trim()} added.`, 'success')
@@ -104,6 +130,10 @@ export function MemberFormModal({ open, mode, member, stores, onClose }: MemberF
           employee_id: form.employee_id,
           phone: form.phone,
           store_slug: form.store_slug || null,
+          // Omitted when blank: the API refuses to clear a department, and an
+          // account from before departments existed may not have one yet.
+          ...(form.department_slug ? { department_slug: form.department_slug } : {}),
+          ...(canSetPay ? { hourly_rate: form.hourly_rate || null } : {}),
           is_active: form.is_active,
         })
         if (form.password) {
@@ -177,11 +207,12 @@ export function MemberFormModal({ open, mode, member, stores, onClose }: MemberF
                 ? 'Staff only see dockets for this store.'
                 : 'Managers see every store; this is their home branch.'
             }
+            required={mode === 'create'}
           >
             <select
               className="select"
               value={form.store_slug}
-              onChange={(e) => patch({ store_slug: e.target.value })}
+              onChange={(e) => changeStore(e.target.value)}
             >
               <option value="">— Not assigned —</option>
               {stores.map((store) => (
@@ -212,6 +243,49 @@ export function MemberFormModal({ open, mode, member, stores, onClose }: MemberF
             </select>
           </Field>
         </div>
+
+        <Field
+          label="Department"
+          required={mode === 'create'}
+          hint={
+            form.store_slug
+              ? 'Where they work in that store. Everyone belongs to one.'
+              : 'Pick a store first — departments are per store.'
+          }
+        >
+          <select
+            className="select"
+            value={form.department_slug}
+            disabled={!form.store_slug}
+            onChange={(e) => patch({ department_slug: e.target.value })}
+            required={mode === 'create'}
+          >
+            <option value="">— Choose a department —</option>
+            {departments.map((branch) => (
+              <option key={branch.slug} value={branch.slug}>
+                {branch.department.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        {canSetPay && (
+          <Field
+            label="Hourly rate"
+            hint="Euro per hour, used to price the roster. Leave blank for the minimum wage."
+          >
+            <input
+              className="input"
+              type="number"
+              inputMode="decimal"
+              step="0.01"
+              min="0"
+              placeholder="Minimum wage"
+              value={form.hourly_rate}
+              onChange={(e) => patch({ hourly_rate: e.target.value })}
+            />
+          </Field>
+        )}
 
         <div className="form-grid form-grid--2">
           <Field label="Employee no.">

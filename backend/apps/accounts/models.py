@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -60,7 +61,24 @@ class User(AbstractUser):
         related_name="users",
         help_text=_("Home store — pre-selected on new dockets."),
     )
+    department = models.ForeignKey(
+        "departments.StoreDepartment",
+        # PROTECT, not SET_NULL: everyone belongs to a department, so one with
+        # staff in it has to be emptied before it can go.
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="members",
+        help_text=_("Department they work in, at their store. Implies the store."),
+    )
     phone = models.CharField(max_length=32, blank=True)
+    hourly_rate = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text=_("Euro per hour. Blank means the national minimum wage."),
+    )
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
@@ -80,3 +98,13 @@ class User(AbstractUser):
     @property
     def full_name(self):
         return f"{self.first_name} {self.last_name}".strip() or self.email
+
+    @property
+    def effective_hourly_rate(self):
+        """What an hour of this person's time costs.
+
+        Nobody is paid below the statutory minimum, so an account without an
+        explicit rate is costed at it rather than at zero — a roster that
+        silently valued somebody at nothing would be worse than useless.
+        """
+        return self.hourly_rate if self.hourly_rate is not None else settings.MINIMUM_HOURLY_RATE

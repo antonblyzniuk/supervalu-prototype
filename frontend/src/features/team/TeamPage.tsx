@@ -8,24 +8,24 @@ import { Field } from '@/components/ui/Field'
 import { PageError, PageLoading } from '@/components/ui/PageState'
 import { useToast } from '@/components/ui/useToast'
 import { useAuth } from '@/features/auth/useAuth'
+import { useDepartments, useStoreDepartments } from '@/features/departments/hooks'
 import { useStores } from '@/features/stores/hooks'
 import { formatDate } from '@/features/dockets/format'
 import { apiErrorMessage } from '@/lib/apiClient'
 
 import { MemberFormModal } from './MemberFormModal'
 import { useTeam, useUpdateTeamMember } from './hooks'
+import { ROLE_TONE } from './roles'
 import type { TeamFilters, TeamMember } from './types'
-
-const ROLE_TONE: Record<string, string> = {
-  staff: 'ambient',
-  manager: 'chilled',
-  admin: 'transfer',
-}
 
 export function TeamPage() {
   const { user } = useAuth()
   const toast = useToast()
   const storesQuery = useStores()
+  // Kinds drive the filter ("everyone in the Deli, whichever store"); the
+  // branches drive the per-row picker, which has to match the person's store.
+  const departments = useDepartments().data ?? []
+  const branches = useStoreDepartments().data ?? []
 
   const [filters, setFilters] = useState<TeamFilters>({})
   const [editing, setEditing] = useState<TeamMember | null>(null)
@@ -36,17 +36,60 @@ export function TeamPage() {
 
   /** Store assignment is the whole point of this page, so it edits in place. */
   async function assignStore(member: TeamMember, slug: string) {
+    const storeName = storesQuery.data?.find((store) => store.slug === slug)?.name
+    // Their department lives in their old store, so a move has to take them to
+    // the same department in the new one or the API refuses the pair outright.
+    const kind = member.department?.department
+    const equivalent = slug
+      ? branches.find(
+          (branch) =>
+            branch.store.slug === slug && branch.department.slug === kind?.slug,
+        )
+      : undefined
+
+    if (slug && kind && !equivalent) {
+      toast.push(
+        `${storeName} does not run ${kind.name}. Move ${member.full_name} to a department there instead.`,
+        'error',
+      )
+      return
+    }
+
     try {
-      await updateMutation.mutateAsync({ id: member.id, store_slug: slug || null })
+      await updateMutation.mutateAsync({
+        id: member.id,
+        store_slug: slug || null,
+        ...(equivalent ? { department_slug: equivalent.slug } : {}),
+      })
       toast.push(
         slug
-          ? `${member.full_name} assigned to ${storesQuery.data?.find((s) => s.slug === slug)?.name}`
+          ? `${member.full_name} assigned to ${storeName}${kind ? ` · ${kind.name}` : ''}`
           : `${member.full_name} unassigned`,
         'success',
       )
     } catch (error) {
       toast.push(apiErrorMessage(error, 'Could not update the assignment.'), 'error')
     }
+  }
+
+  /** Same idea for the department — nobody should be left without one. */
+  async function assignDepartment(member: TeamMember, slug: string) {
+    if (!slug) return
+    try {
+      await updateMutation.mutateAsync({ id: member.id, department_slug: slug })
+      const branch = branches.find((entry) => entry.slug === slug)
+      toast.push(`${member.full_name} moved to ${branch?.department.name}`, 'success')
+    } catch (error) {
+      toast.push(apiErrorMessage(error, 'Could not update the department.'), 'error')
+    }
+  }
+
+  /**
+   * A department belongs to one store, so the picker only ever offers the
+   * departments that the colleague's own store actually runs.
+   */
+  function departmentsFor(member: TeamMember) {
+    return branches.filter((branch) => branch.store.slug === member.store?.slug)
   }
 
   const members = teamQuery.data?.results ?? []
@@ -57,7 +100,8 @@ export function TeamPage() {
         <div>
           <h1 className="page-head__title">Team</h1>
           <p className="page-head__sub">
-            Assign colleagues to a store. Staff only see dockets for the store set here.
+            Assign colleagues to a store and to a department in it. Staff only see dockets, and
+            only the department roster, for the store set here.
           </p>
         </div>
         <div className="page-head__actions">
@@ -77,6 +121,26 @@ export function TeamPage() {
               {storesQuery.data?.map((store) => (
                 <option key={store.slug} value={store.slug}>
                   {store.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Department">
+            <select
+              className="select"
+              value={filters.department__department__slug ?? ''}
+              onChange={(e) =>
+                setFilters({
+                  ...filters,
+                  department__department__slug: e.target.value || undefined,
+                })
+              }
+            >
+              <option value="">All departments</option>
+              {departments.map((department) => (
+                <option key={department.slug} value={department.slug}>
+                  {department.name}
+                  {department.is_active ? '' : ' (archived)'}
                 </option>
               ))}
             </select>
@@ -135,6 +199,7 @@ export function TeamPage() {
                   <th scope="col">Name</th>
                   <th scope="col">Role</th>
                   <th scope="col">Store</th>
+                  <th scope="col">Department</th>
                   <th scope="col">Last seen</th>
                   <th scope="col">
                     <span className="u-sr-only">Actions</span>
@@ -171,6 +236,28 @@ export function TeamPage() {
                         {storesQuery.data?.map((store) => (
                           <option key={store.slug} value={store.slug}>
                             {store.name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td data-label="Department" style={{ minWidth: '190px' }}>
+                      <select
+                        className="select"
+                        aria-label={`Department for ${member.full_name}`}
+                        value={member.department?.slug ?? ''}
+                        // A department is per store, so there is nothing to pick
+                        // from until they have one.
+                        disabled={updateMutation.isPending || !member.store}
+                        onChange={(e) => assignDepartment(member, e.target.value)}
+                      >
+                        {!member.department && (
+                          <option value="">
+                            {member.store ? '— Not assigned —' : '— Assign a store first —'}
+                          </option>
+                        )}
+                        {departmentsFor(member).map((branch) => (
+                          <option key={branch.slug} value={branch.slug}>
+                            {branch.department.name}
                           </option>
                         ))}
                       </select>

@@ -88,6 +88,10 @@ img {
   text-align: right;
 }
 
+.u-center {
+  text-align: center;
+}
+
 .u-nowrap {
   white-space: nowrap;
 }
